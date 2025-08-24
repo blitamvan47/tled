@@ -1,56 +1,78 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>TikTok LED Matrix Monitor</title>
-  <script src="/socket.io/socket.io.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TikTok LED Matrix Dashboard</title>
   <style>
     body {
+      font-family: Arial, sans-serif;
       background: #111;
       color: #eee;
-      font-family: monospace;
+      margin: 0;
       padding: 20px;
     }
-    .event {
-      margin: 8px 0;
-      padding: 10px;
-      border-radius: 6px;
+    h1 {
+      text-align: center;
+      color: #ff2d55;
     }
-    .like { background: #222; color: #4caf50; }
-    .comment { background: #222; color: #03a9f4; }
-    .gift { background: #222; color: #ff9800; }
-    .follow { background: #222; color: #e91e63; }
-    .share { background: #222; color: #9c27b0; }
+    .log {
+      background: #222;
+      padding: 10px;
+      border-radius: 8px;
+      height: 70vh;
+      overflow-y: auto;
+      font-size: 14px;
+    }
+    .event {
+      margin-bottom: 8px;
+      padding: 6px 10px;
+      border-radius: 5px;
+    }
+    .chat { background: #333; }
+    .gift { background: #444; color: #ffd700; }
+    .like { background: #2a2; }
+    .follow { background: #2277ff; }
+    .share { background: #aa22ff; }
+    .nickname { font-weight: bold; }
   </style>
 </head>
 <body>
-  <h1>🎥 TikTok LED Matrix Monitor</h1>
-  <div id="log"></div>
+  <h1>🎥 TikTok Live Dashboard</h1>
+  <div class="log" id="log"></div>
 
   <script>
-    const socket = io();
+    // Sesuaikan URL server WebSocket sesuai domain Render
+    const ws = new WebSocket(`wss://${window.location.host}`);
 
-    const log = document.getElementById("log");
+    const logDiv = document.getElementById("log");
 
-    socket.on("event", (data) => {
+    function addLog(type, user, msg) {
       const div = document.createElement("div");
-      div.classList.add("event", data.type);
+      div.className = `event ${type}`;
+      div.innerHTML = `<span class="nickname">${user}</span>: ${msg}`;
+      logDiv.appendChild(div);
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
 
-      if (data.type === "comment") {
-        div.textContent = `💬 ${data.username}: ${data.comment}`;
-      } else if (data.type === "like") {
-        div.textContent = `❤️ ${data.username} sent ${data.likeCount} likes`;
-      } else if (data.type === "gift") {
-        div.textContent = `🎁 ${data.username} sent gift: ${data.giftName}`;
-      } else if (data.type === "follow") {
-        div.textContent = `➕ ${data.username} followed you!`;
-      } else if (data.type === "share") {
-        div.textContent = `🔗 ${data.username} shared the live!`;
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "chat") {
+          addLog("chat", data.user, data.comment);
+        } else if (data.type === "gift") {
+          addLog("gift", data.user, `sent gift 🎁 ${data.gift}`);
+        } else if (data.type === "like") {
+          addLog("like", data.user, "liked ❤️");
+        } else if (data.type === "follow") {
+          addLog("follow", data.user, "followed ⭐");
+        } else if (data.type === "share") {
+          addLog("share", data.user, "shared 🔗");
+        }
+      } catch (err) {
+        console.error("WS Error:", err);
       }
-
-      log.prepend(div);
-    });
+    };
   </script>
 </body>
 </html>
