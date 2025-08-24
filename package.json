@@ -1,5 +1,5 @@
 {
-  "name": "tiktok-live-matrix",
+  "name": "tiktok-led-matrix",
   "version": "1.0.0",
   "main": "server.js",
   "type": "module",
@@ -7,8 +7,9 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "tiktok-live-connector": "^0.8.7"
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "tiktok-live-connector": "^1.0.0",
+    "ws": "^8.12.0"
   }
 }
