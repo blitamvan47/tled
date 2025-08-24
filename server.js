@@ -1,52 +1,51 @@
 import express from "express";
 import dotenv from "dotenv";
+import { createServer } from "http";
+import { Server } from "socket.io";
 import pkg from "tiktok-live-connector";
 
 dotenv.config();
 
 const { WebcastPushConnection } = pkg;
 const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer);
+
 const PORT = process.env.PORT || 10000;
 
-// Serve frontend (HTML + JS + CSS)
 app.use(express.static("public"));
 
-// TikTok Username dari .env
 const tiktokUsername = process.env.TIKTOK_USERNAME;
-
 if (!tiktokUsername) {
   console.error("❌ ERROR: TIKTOK_USERNAME belum diset di Environment Variables");
   process.exit(1);
 }
 
-// Buat koneksi ke TikTok Live
 const tiktok = new WebcastPushConnection(tiktokUsername);
 
-// Event ketika viewer join
+// Event: User join
 tiktok.on("roomUser", (data) => {
   console.log(`👤 ${data.uniqueId} joined`);
+  io.emit("user-join", data);
 });
 
-// Event ketika ada gift
+// Event: Gift
 tiktok.on("gift", (data) => {
   console.log(`🎁 ${data.uniqueId} mengirim ${data.giftName} x${data.repeatCount}`);
+  io.emit("gift", data);
 });
 
-// Event ketika ada comment
+// Event: Chat
 tiktok.on("chat", (data) => {
   console.log(`💬 ${data.uniqueId}: ${data.comment}`);
+  io.emit("chat", data);
 });
 
-// Start koneksi ke TikTok
+// Connect ke TikTok
 tiktok.connect()
-  .then(state => {
-    console.log(`✅ Connected to roomId ${state.roomId}`);
-  })
-  .catch(err => {
-    console.error("❌ Connection failed:", err);
-  });
+  .then(state => console.log(`✅ Connected to roomId ${state.roomId}`))
+  .catch(err => console.error("❌ Connection failed:", err));
 
-// Start Express server
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
