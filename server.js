@@ -1,74 +1,81 @@
 import express from "express";
-import http from "http";
-import { Server } from "socket.io";
+import { WebSocketServer } from "ws";
+import { TikTokIOConnection } from "tiktok-live-connector";
 import dotenv from "dotenv";
-import { WebcastPushConnection } from "tiktok-live-connector";
 
 dotenv.config();
 
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+const PORT = process.env.PORT || 10000;
+const USERNAME = process.env.TIKTOK_USERNAME || "default_username";
 
-const PORT = process.env.PORT || 8080;
-const TIKTOK_USERNAME = process.env.TIKTOK_USERNAME || "default_username";
+// WebSocket server untuk komunikasi ke ESP32/LED
+const wss = new WebSocketServer({ noServer: true });
 
-// Serve file static (index.html, dll)
-app.use(express.static("public"));
+// Map untuk client LED
+let ledClients = [];
 
-let tiktokConnection = new WebcastPushConnection(TIKTOK_USERNAME);
+// Koneksi ke TikTok Live
+const tiktokConnection = new TikTokIOConnection(USERNAME);
+
+tiktokConnection.connect().then(state => {
+    console.log(`✅ Connected to roomId ${state.roomId}`);
+}).catch(err => {
+    console.error("❌ Failed to connect:", err);
+});
+
+// Kirim event ke semua LED client
+function broadcast(data) {
+    ledClients.forEach(ws => {
+        if (ws.readyState === ws.OPEN) {
+            ws.send(JSON.stringify(data));
+        }
+    });
+}
 
 // Event TikTok
-tiktokConnection.connect().then(state => {
-  console.log(`Connected to roomId ${state.roomId}`);
-}).catch(err => {
-  console.error("Failed to connect", err);
-});
-
-// Event Like
-tiktokConnection.on("like", (data) => {
-  io.emit("event", {
-    type: "like",
-    username: data.uniqueId,
-    likeCount: data.likeCount
-  });
-});
-
-// Event Comment
 tiktokConnection.on("chat", (data) => {
-  io.emit("event", {
-    type: "comment",
-    username: data.uniqueId,
-    comment: data.comment
-  });
+    console.log(`💬 ${data.nickname}: ${data.comment}`);
+    broadcast({ type: "chat", user: data.nickname, comment: data.comment });
 });
 
-// Event Gift
 tiktokConnection.on("gift", (data) => {
-  io.emit("event", {
-    type: "gift",
-    username: data.uniqueId,
-    giftName: data.giftName,
-    repeatEnd: data.repeatEnd
-  });
+    console.log(`🎁 ${data.nickname} sent ${data.giftName}`);
+    broadcast({ type: "gift", user: data.nickname, gift: data.giftName });
 });
 
-// Event Follow
+tiktokConnection.on("like", (data) => {
+    console.log(`❤️ ${data.nickname} liked`);
+    broadcast({ type: "like", user: data.nickname });
+});
+
 tiktokConnection.on("follow", (data) => {
-  io.emit("event", {
-    type: "follow",
-    username: data.uniqueId
-  });
+    console.log(`⭐ ${data.nickname} followed`);
+    broadcast({ type: "follow", user: data.nickname });
 });
 
-// Event Share
 tiktokConnection.on("share", (data) => {
-  io.emit("event", {
-    type: "share",
-    username: data.uniqueId
-  });
+    console.log(`🔗 ${data.nickname} shared the live`);
+    broadcast({ type: "share", user: data.nickname });
 });
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// Server HTTP + WebSocket upgrade
+const server = app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+});
+
+server.on("upgrade", (req, socket, head) => {
+    wss.handleUpgrade(req, socket, head, (ws) => {
+        ledClients.push(ws);
+        console.log("🔌 LED client connected");
+
+        ws.on("close", () => {
+            ledClients = ledClients.filter(client => client !== ws);
+            console.log("❌ LED client disconnected");
+        });
+    });
+});
+
+app.get("/", (req, res) => {
+    res.send("TikTok LED Matrix Server is running 🚀");
 });
