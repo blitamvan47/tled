@@ -1,18 +1,15 @@
 {
-  "name": "tiktok-live-matrix",
+  "name": "tiktok-led-matrix",
   "version": "1.0.0",
-  "description": "TikTok Live WS2812B Matrix Overlay",
   "main": "server.js",
+  "type": "module",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "dotenv": "^16.4.5",
+    "dotenv": "^16.0.3",
     "express": "^4.18.2",
-    "socket.io": "^4.7.5",
-    "tiktok-live-connector": "^1.0.13"
-  },
-  "engines": {
-    "node": ">=18"
+    "tiktok-live-connector": "^1.0.0",
+    "ws": "^8.12.0"
   }
 }
