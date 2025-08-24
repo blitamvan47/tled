@@ -1,81 +1,52 @@
 import express from "express";
-import { WebSocketServer } from "ws";
-import { TikTokIOConnection } from "tiktok-live-connector";
 import dotenv from "dotenv";
+import pkg from "tiktok-live-connector";
 
 dotenv.config();
 
+const { WebcastPushConnection } = pkg;
 const app = express();
 const PORT = process.env.PORT || 10000;
-const USERNAME = process.env.TIKTOK_USERNAME || "default_username";
 
-// WebSocket server untuk komunikasi ke ESP32/LED
-const wss = new WebSocketServer({ noServer: true });
+// Serve frontend (HTML + JS + CSS)
+app.use(express.static("public"));
 
-// Map untuk client LED
-let ledClients = [];
+// TikTok Username dari .env
+const tiktokUsername = process.env.TIKTOK_USERNAME;
 
-// Koneksi ke TikTok Live
-const tiktokConnection = new TikTokIOConnection(USERNAME);
-
-tiktokConnection.connect().then(state => {
-    console.log(`✅ Connected to roomId ${state.roomId}`);
-}).catch(err => {
-    console.error("❌ Failed to connect:", err);
-});
-
-// Kirim event ke semua LED client
-function broadcast(data) {
-    ledClients.forEach(ws => {
-        if (ws.readyState === ws.OPEN) {
-            ws.send(JSON.stringify(data));
-        }
-    });
+if (!tiktokUsername) {
+  console.error("❌ ERROR: TIKTOK_USERNAME belum diset di Environment Variables");
+  process.exit(1);
 }
 
-// Event TikTok
-tiktokConnection.on("chat", (data) => {
-    console.log(`💬 ${data.nickname}: ${data.comment}`);
-    broadcast({ type: "chat", user: data.nickname, comment: data.comment });
+// Buat koneksi ke TikTok Live
+const tiktok = new WebcastPushConnection(tiktokUsername);
+
+// Event ketika viewer join
+tiktok.on("roomUser", (data) => {
+  console.log(`👤 ${data.uniqueId} joined`);
 });
 
-tiktokConnection.on("gift", (data) => {
-    console.log(`🎁 ${data.nickname} sent ${data.giftName}`);
-    broadcast({ type: "gift", user: data.nickname, gift: data.giftName });
+// Event ketika ada gift
+tiktok.on("gift", (data) => {
+  console.log(`🎁 ${data.uniqueId} mengirim ${data.giftName} x${data.repeatCount}`);
 });
 
-tiktokConnection.on("like", (data) => {
-    console.log(`❤️ ${data.nickname} liked`);
-    broadcast({ type: "like", user: data.nickname });
+// Event ketika ada comment
+tiktok.on("chat", (data) => {
+  console.log(`💬 ${data.uniqueId}: ${data.comment}`);
 });
 
-tiktokConnection.on("follow", (data) => {
-    console.log(`⭐ ${data.nickname} followed`);
-    broadcast({ type: "follow", user: data.nickname });
-});
+// Start koneksi ke TikTok
+tiktok.connect()
+  .then(state => {
+    console.log(`✅ Connected to roomId ${state.roomId}`);
+  })
+  .catch(err => {
+    console.error("❌ Connection failed:", err);
+  });
 
-tiktokConnection.on("share", (data) => {
-    console.log(`🔗 ${data.nickname} shared the live`);
-    broadcast({ type: "share", user: data.nickname });
-});
-
-// Server HTTP + WebSocket upgrade
-const server = app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-});
-
-server.on("upgrade", (req, socket, head) => {
-    wss.handleUpgrade(req, socket, head, (ws) => {
-        ledClients.push(ws);
-        console.log("🔌 LED client connected");
-
-        ws.on("close", () => {
-            ledClients = ledClients.filter(client => client !== ws);
-            console.log("❌ LED client disconnected");
-        });
-    });
-});
-
-app.get("/", (req, res) => {
-    res.send("TikTok LED Matrix Server is running 🚀");
+// Start Express server
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });
