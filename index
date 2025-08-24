@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TikTok LED Matrix Monitor</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body {
+      background: #111;
+      color: #eee;
+      font-family: monospace;
+      padding: 20px;
+    }
+    .event {
+      margin: 8px 0;
+      padding: 10px;
+      border-radius: 6px;
+    }
+    .like { background: #222; color: #4caf50; }
+    .comment { background: #222; color: #03a9f4; }
+    .gift { background: #222; color: #ff9800; }
+    .follow { background: #222; color: #e91e63; }
+    .share { background: #222; color: #9c27b0; }
+  </style>
+</head>
+<body>
+  <h1>🎥 TikTok LED Matrix Monitor</h1>
+  <div id="log"></div>
+
+  <script>
+    const socket = io();
+
+    const log = document.getElementById("log");
+
+    socket.on("event", (data) => {
+      const div = document.createElement("div");
+      div.classList.add("event", data.type);
+
+      if (data.type === "comment") {
+        div.textContent = `💬 ${data.username}: ${data.comment}`;
+      } else if (data.type === "like") {
+        div.textContent = `❤️ ${data.username} sent ${data.likeCount} likes`;
+      } else if (data.type === "gift") {
+        div.textContent = `🎁 ${data.username} sent gift: ${data.giftName}`;
+      } else if (data.type === "follow") {
+        div.textContent = `➕ ${data.username} followed you!`;
+      } else if (data.type === "share") {
+        div.textContent = `🔗 ${data.username} shared the live!`;
+      }
+
+      log.prepend(div);
+    });
+  </script>
+</body>
+</html>
